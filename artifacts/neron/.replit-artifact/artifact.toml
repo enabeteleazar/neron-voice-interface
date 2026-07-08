@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Neron — Assistant Personnel"
+version = "1.0.0"
+id = "artifacts/neron"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20506
+
+[services.development]
+run = "pnpm --filter @workspace/neron run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/neron", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/neron/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20506"
+BASE_PATH = "/"
