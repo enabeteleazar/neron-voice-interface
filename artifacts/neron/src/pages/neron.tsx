@@ -1,5 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Cloud, Sun, CloudSun, CloudRain, CloudSnow, Wind } from 'lucide-react';
+
+// ---- Helpers ----
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'Bonjour';
+  if (h >= 12 && h < 18) return 'Bon après-midi';
+  return 'Bonsoir';
+}
+
+// Simulated weather (no API key needed for the demo)
+const WEATHER = { temp: 22, condition: 'Nuageux' } as const;
+
+function WeatherIcon({ className }: { className?: string }) {
+  return <CloudSun className={className} strokeWidth={1.5} />;
+}
 
 type NeronState = 'idle' | 'listening' | 'processing' | 'speaking';
 
@@ -55,21 +71,9 @@ const Neron: React.FC = () => {
       {/* Main Orb */}
       <Orb state={state} />
 
-      {/* Idle Text */}
+      {/* Idle Greeting Widget */}
       <AnimatePresence>
-        {state === 'idle' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 1.5, ease: "easeInOut" }}
-            className="absolute top-[60%] flex flex-col items-center pointer-events-none"
-          >
-            <p className="text-xl md:text-2xl font-light text-foreground/70 tracking-wide text-center">
-              Je t'écoute, quand tu veux.
-            </p>
-          </motion.div>
-        )}
+        {state === 'idle' && <IdleGreeting key="greeting" />}
       </AnimatePresence>
 
       {/* Bottom Widget */}
@@ -85,6 +89,42 @@ const Neron: React.FC = () => {
 // ==============================================
 // SUBCOMPONENTS
 // ==============================================
+
+const IdleGreeting: React.FC = () => {
+  const greeting = getGreeting();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 1.2, ease: 'easeInOut' }}
+      className="absolute top-[58%] flex flex-col items-start px-10 w-full pointer-events-none"
+    >
+      {/* Weather pill */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 1, delay: 0.2 }}
+        className="flex items-center gap-2 mb-4 bg-white/30 backdrop-blur-md rounded-2xl px-4 py-2 border border-white/50 shadow-sm"
+      >
+        <WeatherIcon className="w-5 h-5 text-foreground/50" />
+        <span className="text-sm font-light text-foreground/60 tracking-wide">
+          {WEATHER.temp}° — {WEATHER.condition}
+        </span>
+      </motion.div>
+
+      {/* Greeting */}
+      <motion.p
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1, delay: 0.4 }}
+        className="text-2xl font-light text-foreground/75 tracking-wide leading-snug"
+      >
+        {greeting}.
+      </motion.p>
+    </motion.div>
+  );
+};
 
 const Background: React.FC<{ state: NeronState }> = ({ state }) => {
   return (
