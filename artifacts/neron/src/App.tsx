@@ -9,7 +9,7 @@ const queryClient = new QueryClient();
 
 function Router() {
   return (
-    <div className="w-full max-w-[430px] mx-auto bg-background shadow-2xl relative">
+    <div className="w-full min-h-screen bg-background relative">
       <Switch>
         <Route path="/" component={Neron} />
         <Route component={NotFound} />
@@ -23,7 +23,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         {/* We place it in a container that forces the max mobile width on desktop, centered */}
-        <div className="min-h-screen w-full bg-[#f8f7fa] flex justify-center overflow-hidden">
+        <div className="min-h-screen w-full bg-[#f8f7fa] overflow-hidden">
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
             <Router />
           </WouterRouter>
