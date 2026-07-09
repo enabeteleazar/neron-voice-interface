@@ -98,7 +98,7 @@ const IdleGreeting: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 1.2, ease: 'easeInOut' }}
-      className="absolute top-[58%] flex flex-col items-start px-10 w-full pointer-events-none"
+      className="absolute top-[58%] flex flex-col items-center px-10 w-full pointer-events-none"
     >
       {/* Weather pill */}
       <motion.div
@@ -118,7 +118,7 @@ const IdleGreeting: React.FC = () => {
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1, delay: 0.4 }}
-        className="text-2xl font-light text-foreground/75 tracking-wide leading-snug"
+        className="text-2xl font-light text-foreground/75 tracking-wide leading-snug text-center"
       >
         {greeting}.
       </motion.p>
