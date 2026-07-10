@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Cloud, Sun, CloudSun, CloudRain, CloudSnow, Wind } from 'lucide-react';
+import { useNeronGateway } from '@/hooks/use-neron-gateway';
+import { useToast } from '@/hooks/use-toast';
 
 // ---- Helpers ----
 function getGreeting(): string {
@@ -20,45 +22,14 @@ function WeatherIcon({ className }: { className?: string }) {
 type NeronState = 'idle' | 'listening' | 'processing' | 'speaking';
 
 const Neron: React.FC = () => {
-  const [state, setState] = useState<NeronState>('idle');
-  const [speakingText, setSpeakingText] = useState("");
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const clearTimer = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-  };
-
-  const handleTap = () => {
-    if (state === 'idle') {
-      setState('listening');
-      
-      // Auto-transition to processing after 3 seconds
-      clearTimer();
-      timerRef.current = setTimeout(() => {
-        setState('processing');
-        
-        // Brief processing flash before speaking
-        timerRef.current = setTimeout(() => {
-          setState('speaking');
-          
-          // Auto-return to idle after 4 seconds of speaking
-          timerRef.current = setTimeout(() => {
-            setState('idle');
-          }, 4000);
-          
-        }, 600);
-      }, 3000);
-    } else if (state === 'listening') {
-      // Cancel back to idle
-      clearTimer();
-      setState('idle');
-    }
-    // If processing or speaking, do nothing on tap for this demo
-  };
+  const { state, transcript, responseText, error, handleTap } = useNeronGateway();
+  const { toast } = useToast();
 
   useEffect(() => {
-    return () => clearTimer();
-  }, []);
+    if (error) {
+      toast({ title: 'Néron', description: error, variant: 'destructive' });
+    }
+  }, [error, toast]);
 
   return (
     <div 
@@ -79,7 +50,7 @@ const Neron: React.FC = () => {
       {/* Bottom Widget */}
       <AnimatePresence>
         {state !== 'idle' && (
-          <Widget state={state} />
+          <Widget state={state} transcript={transcript} responseText={responseText} />
         )}
       </AnimatePresence>
     </div>
@@ -306,7 +277,7 @@ const SpeakingOrb: React.FC = () => {
 // Bottom Widget
 // ----------------------------------------------
 
-const Widget: React.FC<{ state: NeronState }> = ({ state }) => {
+const Widget: React.FC<{ state: NeronState; transcript: string; responseText: string }> = ({ state, transcript, responseText }) => {
   return (
     <motion.div
       initial={{ y: 100, opacity: 0 }}
@@ -318,8 +289,8 @@ const Widget: React.FC<{ state: NeronState }> = ({ state }) => {
       <div className="px-6 py-5 min-h-[80px] flex items-center">
         <AnimatePresence mode="wait">
           {state === 'listening' && <ListeningContent key="listening" />}
-          {state === 'processing' && <ProcessingContent key="processing" />}
-          {state === 'speaking' && <SpeakingContent key="speaking" />}
+          {state === 'processing' && <ProcessingContent key="processing" transcript={transcript} />}
+          {state === 'speaking' && <SpeakingContent key="speaking" responseText={responseText} />}
         </AnimatePresence>
       </div>
     </motion.div>
@@ -349,33 +320,31 @@ const ListeningContent: React.FC = () => {
   );
 };
 
-const ProcessingContent: React.FC = () => {
+const ProcessingContent: React.FC<{ transcript: string }> = ({ transcript }) => {
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 1.05 }}
-      className="w-full flex items-center gap-3"
+      className="w-full flex flex-col gap-2"
     >
-      <motion.div 
-        animate={{ opacity: [0.3, 1, 0.3] }}
-        transition={{ duration: 1.5, repeat: Infinity }}
-        className="w-3 h-3 rounded-full bg-primary/50"
-      />
-      <span className="text-foreground/60 italic tracking-wide text-sm">Traitement...</span>
+      <div className="flex items-center gap-3">
+        <motion.div 
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="w-3 h-3 rounded-full bg-primary/50"
+        />
+        <span className="text-foreground/60 italic tracking-wide text-sm">Traitement...</span>
+      </div>
+      {transcript && (
+        <p className="text-foreground/50 text-sm italic leading-snug">« {transcript} »</p>
+      )}
     </motion.div>
   );
 };
 
-const haiku = [
-  "Le silence",
-  "aussi",
-  "est",
-  "une",
-  "réponse."
-];
-
-const SpeakingContent: React.FC = () => {
+const SpeakingContent: React.FC<{ responseText: string }> = ({ responseText }) => {
+  const words = responseText ? responseText.split(' ') : ['...'];
   return (
     <motion.div 
       initial={{ opacity: 0, y: 5 }}
@@ -387,12 +356,12 @@ const SpeakingContent: React.FC = () => {
         Neron
       </span>
       <div className="text-foreground/90 font-medium leading-relaxed">
-        {haiku.map((word, i) => (
+        {words.map((word, i) => (
           <motion.span
-            key={i}
+            key={`${word}-${i}`}
             initial={{ opacity: 0, filter: "blur(4px)" }}
             animate={{ opacity: 1, filter: "blur(0px)" }}
-            transition={{ duration: 0.4, delay: i * 0.4 + 0.2 }}
+            transition={{ duration: 0.3, delay: Math.min(i * 0.08, 1.5) }}
             className="inline-block mr-1"
           >
             {word}
