@@ -90,6 +90,25 @@ export function useNeronGateway(options: UseNeronGatewayOptions = {}): UseNeronG
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const mimeRef = useRef(pickMimeType());
 
+  function getAudioEl(): HTMLAudioElement {
+    if (!audioElRef.current) {
+      audioElRef.current = new Audio();
+    }
+    return audioElRef.current;
+  }
+
+  // Déverrouille la lecture audio programmatique (politique autoplay de
+  // Safari/iOS) : doit être appelé de façon SYNCHRONE dans un gestionnaire
+  // de geste utilisateur (avant le premier `await`), sur l'élément qui
+  // servira ensuite à jouer la vraie réponse.
+  function unlockAudioPlayback() {
+    const audio = getAudioEl();
+    audio.muted = true;
+    audio.play().catch(() => {});
+    audio.pause();
+    audio.muted = false;
+  }
+
   // ── Connexion WebSocket (une fois, montée du composant) ──────────────────
   useEffect(() => {
     let cancelled = false;
@@ -148,8 +167,8 @@ export function useNeronGateway(options: UseNeronGatewayOptions = {}): UseNeronG
           const audioB64 = msg.data?.audio_b64;
           const mimetype = msg.data?.mimetype || 'audio/wav';
           if (audioB64) {
-            const audio = new Audio(`data:${mimetype};base64,${audioB64}`);
-            audioElRef.current = audio;
+            const audio = getAudioEl();
+            audio.src = `data:${mimetype};base64,${audioB64}`;
             setState('speaking');
             audio.onended = () => setState('idle');
             audio.onerror = () => {
@@ -194,6 +213,7 @@ export function useNeronGateway(options: UseNeronGatewayOptions = {}): UseNeronG
     setError(null);
     setTranscript('');
     setResponseText('');
+    unlockAudioPlayback();
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setError("Ce navigateur ne supporte pas l'enregistrement audio.");
