@@ -1,4 +1,4 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
+
 pnpm install --frozen-lockfile
-pnpm --filter db push
