@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Cloud, Sun, CloudSun, CloudRain, CloudSnow, Wind } from 'lucide-react';
 import { useNeronGateway } from '@/hooks/use-neron-gateway';
 import { useToast } from '@/hooks/use-toast';
+import { useWeather, type WeatherData, type WeatherIconKey } from '@/hooks/use-weather';
 
 // ---- Helpers ----
 function getGreeting(): string {
@@ -12,17 +13,25 @@ function getGreeting(): string {
   return 'Bonsoir';
 }
 
-// Simulated weather (no API key needed for the demo)
-const WEATHER = { temp: 22, condition: 'Nuageux' } as const;
+const WEATHER_ICONS: Record<WeatherIconKey, typeof Sun> = {
+  sun: Sun,
+  'cloud-sun': CloudSun,
+  cloud: Cloud,
+  'cloud-rain': CloudRain,
+  'cloud-snow': CloudSnow,
+  wind: Wind,
+};
 
-function WeatherIcon({ className }: { className?: string }) {
-  return <CloudSun className={className} strokeWidth={1.5} />;
+function WeatherIcon({ icon, className }: { icon: WeatherIconKey; className?: string }) {
+  const Icon = WEATHER_ICONS[icon];
+  return <Icon className={className} strokeWidth={1.5} />;
 }
 
 type NeronState = 'idle' | 'listening' | 'processing' | 'speaking';
 
 const Neron: React.FC = () => {
   const { state, transcript, responseText, error, handleTap } = useNeronGateway();
+  const { weather } = useWeather();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,7 +53,7 @@ const Neron: React.FC = () => {
 
       {/* Idle Greeting Widget */}
       <AnimatePresence>
-        {state === 'idle' && <IdleGreeting key="greeting" />}
+        {state === 'idle' && <IdleGreeting key="greeting" weather={weather} />}
       </AnimatePresence>
 
       {/* Bottom Widget */}
@@ -61,7 +70,7 @@ const Neron: React.FC = () => {
 // SUBCOMPONENTS
 // ==============================================
 
-const IdleGreeting: React.FC = () => {
+const IdleGreeting: React.FC<{ weather: WeatherData | null }> = ({ weather }) => {
   const greeting = getGreeting();
   return (
     <motion.div
@@ -71,18 +80,21 @@ const IdleGreeting: React.FC = () => {
       transition={{ duration: 1.2, ease: 'easeInOut' }}
       className="absolute top-[58%] flex flex-col items-center px-10 w-full pointer-events-none"
     >
-      {/* Weather pill */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.92 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1, delay: 0.2 }}
-        className="flex items-center gap-2 mb-4 bg-white/30 backdrop-blur-md rounded-2xl px-4 py-2 border border-white/50 shadow-sm"
-      >
-        <WeatherIcon className="w-5 h-5 text-foreground/50" />
-        <span className="text-sm font-light text-foreground/60 tracking-wide">
-          {WEATHER.temp}° — {WEATHER.condition}
-        </span>
-      </motion.div>
+      {/* Weather pill — masquée si la météo n'a pas pu être récupérée,
+          plutôt que d'afficher une valeur inventée */}
+      {weather && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1, delay: 0.2 }}
+          className="flex items-center gap-2 mb-4 bg-white/30 backdrop-blur-md rounded-2xl px-4 py-2 border border-white/50 shadow-sm"
+        >
+          <WeatherIcon icon={weather.icon} className="w-5 h-5 text-foreground/50" />
+          <span className="text-sm font-light text-foreground/60 tracking-wide">
+            {weather.temp}° — {weather.condition}
+          </span>
+        </motion.div>
+      )}
 
       {/* Greeting */}
       <motion.p
@@ -358,7 +370,7 @@ const SpeakingContent: React.FC<{ responseText: string }> = ({ responseText }) =
       <div className="text-foreground/90 font-medium leading-relaxed">
         {words.map((word, i) => (
           <motion.span
-            key={`${word}-${i}`}
+            key={`word-${i}`}
             initial={{ opacity: 0, filter: "blur(4px)" }}
             animate={{ opacity: 1, filter: "blur(0px)" }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.08, 1.5) }}
