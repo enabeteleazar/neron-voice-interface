@@ -28,14 +28,16 @@ Première version stable de l'interface vocale.
 - Spécification OpenAPI de Néron Core (`neron-api.json`) versionnée dans le
   repo comme référence client.
 
-### Connu / limitations
-- Widget météo affiché en écran d'accueil : donnée simulée, non connectée à
-  une source réelle.
-- Pas de reconnexion WebSocket automatique en cas de coupure du gateway.
-- `artifacts/mockup-sandbox` (canvas de prototypage Replit) est présent dans
-  le repo mais n'est pas destiné à la production.
+### Corrigé
+- Widget météo : remplacement des valeurs simulées par une donnée réelle
+  (Open-Meteo, géolocalisation avec repli configurable, rafraîchissement
+  périodique et au retour au premier plan).
+- Reconnexion WebSocket automatique avec backoff exponentiel plafonné en cas
+  de coupure du gateway, avec nettoyage propre d'un enregistrement en cours.
 
 ### Sécurité
 - Aucun secret en clair dans le code — configuration exclusivement via
   variables d'environnement (`VITE_NERON_WS_URL`, `VITE_NERON_TOKEN`).
 - `pnpm audit --prod` : aucune vulnérabilité connue au moment du tag.
+
+[1.0.0]: https://github.com/enabeteleazar/neron-voice-interface/releases/tag/v1.0.0
