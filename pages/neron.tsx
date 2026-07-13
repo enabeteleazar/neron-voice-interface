@@ -370,7 +370,7 @@ const SpeakingContent: React.FC<{ responseText: string }> = ({ responseText }) =
       <div className="text-foreground/90 font-medium leading-relaxed">
         {words.map((word, i) => (
           <motion.span
-            key={`word-${i}`}
+            key={`${word}-${i}`}
             initial={{ opacity: 0, filter: "blur(4px)" }}
             animate={{ opacity: 1, filter: "blur(0px)" }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.08, 1.5) }}
