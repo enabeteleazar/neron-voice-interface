@@ -68,6 +68,10 @@ function nextReqId(): string {
   return `voice-${reqIdCounter}`;
 }
 
+// Reconnexion avec backoff exponentiel plafonné : 1s, 2s, 4s, 8s, 16s, 30s, 30s...
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 30000;
+
 export function useNeronGateway(options: UseNeronGatewayOptions = {}): UseNeronGatewayResult {
   const {
     wsUrl = import.meta.env.VITE_NERON_WS_URL ?? 'ws://localhost:18789/ws',
@@ -89,6 +93,11 @@ export function useNeronGateway(options: UseNeronGatewayOptions = {}): UseNeronG
   const streamRef = useRef<MediaStream | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const mimeRef = useRef(pickMimeType());
+  const stateRef = useRef<NeronState>('idle');
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   function getAudioEl(): HTMLAudioElement {
     if (!audioElRef.current) {
@@ -109,101 +118,150 @@ export function useNeronGateway(options: UseNeronGatewayOptions = {}): UseNeronG
     audio.muted = false;
   }
 
-  // ── Connexion WebSocket (une fois, montée du composant) ──────────────────
+  // ── Connexion WebSocket, avec reconnexion automatique ─────────────────────
   useEffect(() => {
     let cancelled = false;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    let disconnectNotified = false;
 
-    ws.onmessage = (evt) => {
+    function scheduleReconnect() {
       if (cancelled) return;
-      let msg: any;
-      try {
-        msg = JSON.parse(evt.data);
-      } catch {
-        return;
-      }
+      const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
+      attempt += 1;
+      reconnectTimer = setTimeout(connect, delay);
+    }
 
-      // Auth handshake
-      if (msg.event === 'gateway.auth_required') {
-        if (token) {
-          ws.send(JSON.stringify({
-            id: 'auth',
-            method: 'gateway.auth',
-            params: { token },
-          }));
-        } else {
-          setError("Le gateway exige un token d'authentification.");
-        }
-        return;
-      }
-      if (msg.id === 'auth') {
-        if (msg.error) {
-          setError('Authentification refusée par le gateway.');
-        } else {
-          authenticatedRef.current = true;
-          setConnected(true);
-        }
-        return;
-      }
+    function connect() {
+      if (cancelled) return;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+      authenticatedRef.current = false;
 
-      // Events du pipeline vocal
-      switch (msg.event) {
-        case 'voice.transcription':
-          setTranscript(msg.data?.text ?? '');
-          break;
-        case 'agent.token':
-          setResponseText((prev) => prev + (msg.data?.token ?? ''));
-          break;
-        case 'agent.done':
-          // Si pas de synthèse demandée, on affiche la réponse texte puis
-          // on revient à idle après un court délai.
-          if (!synthesize) {
-            setState('speaking');
-            setTimeout(() => setState('idle'), 4000);
-          }
-          break;
-        case 'voice.audio': {
-          const audioB64 = msg.data?.audio_b64;
-          const mimetype = msg.data?.mimetype || 'audio/wav';
-          if (audioB64) {
-            const audio = getAudioEl();
-            audio.src = `data:${mimetype};base64,${audioB64}`;
-            setState('speaking');
-            audio.onended = () => setState('idle');
-            audio.onerror = () => {
-              setError('Lecture audio impossible.');
-              setState('idle');
-            };
-            audio.play().catch(() => {
-              setError('Lecture audio bloquée par le navigateur.');
-              setState('idle');
-            });
+      ws.onmessage = (evt) => {
+        if (cancelled) return;
+        let msg: any;
+        try {
+          msg = JSON.parse(evt.data);
+        } catch {
+          return;
+        }
+
+        // Auth handshake
+        if (msg.event === 'gateway.auth_required') {
+          if (token) {
+            ws.send(JSON.stringify({
+              id: 'auth',
+              method: 'gateway.auth',
+              params: { token },
+            }));
           } else {
-            setState('idle');
+            setError("Le gateway exige un token d'authentification.");
           }
-          break;
+          return;
         }
-        case 'agent.error':
-        case 'voice.error':
-          setError(msg.data?.message ?? 'Erreur inconnue.');
-          setState('idle');
-          break;
-        default:
-          break;
-      }
-    };
+        if (msg.id === 'auth') {
+          if (msg.error) {
+            setError('Authentification refusée par le gateway.');
+          } else {
+            authenticatedRef.current = true;
+            setConnected(true);
+            attempt = 0;
+            if (disconnectNotified) {
+              disconnectNotified = false;
+              setError(null);
+            }
+          }
+          return;
+        }
 
-    ws.onerror = () => {
-      if (!cancelled) setError('Connexion au gateway impossible.');
-    };
-    ws.onclose = () => {
-      if (!cancelled) setConnected(false);
-    };
+        // Events du pipeline vocal
+        switch (msg.event) {
+          case 'voice.transcription':
+            setTranscript(msg.data?.text ?? '');
+            break;
+          case 'agent.token':
+            setResponseText((prev) => prev + (msg.data?.token ?? ''));
+            break;
+          case 'agent.done':
+            // Si pas de synthèse demandée, on affiche la réponse texte puis
+            // on revient à idle après un court délai.
+            if (!synthesize) {
+              setState('speaking');
+              setTimeout(() => setState('idle'), 4000);
+            }
+            break;
+          case 'voice.audio': {
+            const audioB64 = msg.data?.audio_b64;
+            const mimetype = msg.data?.mimetype || 'audio/wav';
+            if (audioB64) {
+              const audio = getAudioEl();
+              audio.src = `data:${mimetype};base64,${audioB64}`;
+              setState('speaking');
+              audio.onended = () => setState('idle');
+              audio.onerror = () => {
+                setError('Lecture audio impossible.');
+                setState('idle');
+              };
+              audio.play().catch(() => {
+                setError('Lecture audio bloquée par le navigateur.');
+                setState('idle');
+              });
+            } else {
+              setState('idle');
+            }
+            break;
+          }
+          case 'agent.error':
+          case 'voice.error':
+            setError(msg.data?.message ?? 'Erreur inconnue.');
+            setState('idle');
+            break;
+          default:
+            break;
+        }
+      };
+
+      // onerror est systématiquement suivi de onclose côté spec WebSocket :
+      // toute la logique de notification/reconnexion est centralisée là-bas
+      // pour éviter un double message.
+      ws.onerror = () => {};
+
+      ws.onclose = () => {
+        if (cancelled) return;
+        setConnected(false);
+        authenticatedRef.current = false;
+
+        // Coupure pendant un enregistrement/traitement en cours : on nettoie
+        // proprement plutôt que de laisser l'utilisateur bloqué sur un état
+        // qui ne pourra jamais aboutir.
+        const recorder = mediaRecorderRef.current;
+        if (recorder && recorder.state !== 'inactive') {
+          recorder.stop();
+        }
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (stateRef.current !== 'idle') {
+          setState('idle');
+        }
+
+        // Un seul toast de notification par coupure (pas un par tentative),
+        // effacé automatiquement à la reconnexion réussie.
+        if (!disconnectNotified) {
+          disconnectNotified = true;
+          setError('Connexion au gateway perdue — reconnexion automatique en cours...');
+        }
+
+        scheduleReconnect();
+      };
+    }
+
+    connect();
 
     return () => {
       cancelled = true;
-      ws.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      wsRef.current?.close();
       wsRef.current = null;
     };
   }, [wsUrl, token, synthesize]);
