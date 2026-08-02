@@ -48,7 +48,7 @@ Seul `artifacts/neron` est buildé et servi en production (voir
 ## Installation
 
 ```bash
-git clone https://github.com/enabeteleazar/neron-voice-interface neron
+git clone https://github.com/enabeteleazar/neronVoiceInterface neron
 cd neron
 pnpm install
 ```

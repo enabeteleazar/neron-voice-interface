@@ -40,4 +40,4 @@ Première version stable de l'interface vocale.
   variables d'environnement (`VITE_NERON_WS_URL`, `VITE_NERON_TOKEN`).
 - `pnpm audit --prod` : aucune vulnérabilité connue au moment du tag.
 
-[1.0.0]: https://github.com/enabeteleazar/neron-voice-interface/releases/tag/v1.0.0
+[1.0.0]: https://github.com/enabeteleazar/neronVoiceInterface/releases/tag/v1.0.0
