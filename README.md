@@ -31,12 +31,12 @@ le flux de réponse texte, puis la synthèse vocale (TTS).
 ```
 artifacts/
   neron/            → @workspace/neron — l'application réelle (voir .replit-artifact/artifact.toml)
-  mockup-sandbox/    → @workspace/mockup-sandbox — canvas de prototypage UI (Replit), pas déployé en prod
 scripts/             → @workspace/scripts — utilitaires internes (placeholder pour l'instant)
 neron-api.json       → spec OpenAPI de Néron Core, utilisée comme référence côté client
 ```
 
-Seul `artifacts/neron` est buildé et servi en production (voir
+`artifacts/neron` est le seul package d'application du workspace ; c'est lui
+qui est buildé et servi en production (voir
 `artifacts/neron/.replit-artifact/artifact.toml`).
 
 ## Prérequis
@@ -98,12 +98,9 @@ Variables de build (non liées à `.env`, à passer à la commande) :
 
 ## Limitations connues
 
-- Le widget météo affiché en idle (`WeatherIcon`, `22° — Nuageux`) est une
-  donnée **simulée**, non branchée à une source réelle.
-- Aucune reconnexion WebSocket automatique : si le gateway coupe, l'app reste
-  en état déconnecté jusqu'au rechargement de la page.
-- `artifacts/mockup-sandbox` est un outil de prototypage Replit, non destiné à
-  la production.
+- Aucune authentification ni chiffrement de bout en bout côté navigateur au
+  delà du token de gateway : la sécurité du flux repose sur `wss://` +
+  reverse proxy en production.
 
 ## Licence
 
