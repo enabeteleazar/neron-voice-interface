@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Cloud, Sun, CloudSun, CloudRain, CloudSnow, Wind } from 'lucide-react';
 import { useNeronGateway } from '@/hooks/use-neron-gateway';
@@ -11,6 +11,23 @@ function getGreeting(): string {
   if (h >= 5 && h < 12) return 'Bonjour';
   if (h >= 12 && h < 18) return 'Bon après-midi';
   return 'Bonsoir';
+}
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Heure courante, rafraîchie chaque seconde pour rester juste au changement
+// de minute sans dépendre d'un setInterval calé sur l'horloge système.
+function useClock(): string {
+  const [time, setTime] = useState(() => formatTime(new Date()));
+
+  useEffect(() => {
+    const interval = setInterval(() => setTime(formatTime(new Date())), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return time;
 }
 
 const WEATHER_ICONS: Record<WeatherIconKey, typeof Sun> = {
@@ -29,10 +46,18 @@ function WeatherIcon({ icon, className }: { icon: WeatherIconKey; className?: st
 
 type NeronState = 'idle' | 'listening' | 'processing' | 'speaking';
 
+const TAP_LABELS: Record<NeronState, string> = {
+  idle: 'Parler à Néron',
+  listening: "Arrêter l'écoute et envoyer",
+  processing: 'Traitement en cours',
+  speaking: 'Interrompre la réponse',
+};
+
 const Neron: React.FC = () => {
   const { state, transcript, responseText, error, handleTap } = useNeronGateway();
   const { weather } = useWeather();
   const { toast } = useToast();
+  const time = useClock();
 
   useEffect(() => {
     if (error) {
@@ -41,12 +66,26 @@ const Neron: React.FC = () => {
   }, [error, toast]);
 
   return (
-    <div 
+    <div
       className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden bg-background cursor-pointer selection:bg-transparent"
       onClick={handleTap}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleTap();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={TAP_LABELS[state]}
     >
       {/* Background animated gradient */}
       <Background state={state} />
+
+      {/* Horloge — toujours visible, quel que soit l'état */}
+      <div className="absolute top-6 z-20 text-sm font-light tracking-widest text-foreground/50 pointer-events-none tabular-nums">
+        {time}
+      </div>
 
       {/* Main Orb */}
       <Orb state={state} />
@@ -62,6 +101,13 @@ const Neron: React.FC = () => {
           <Widget state={state} transcript={transcript} responseText={responseText} />
         )}
       </AnimatePresence>
+
+      {/* Région live pour lecteurs d'écran : annonce transcription/réponse
+          sans dupliquer le contenu visuel du Widget. */}
+      <div className="sr-only" aria-live="polite">
+        {state === 'processing' && transcript}
+        {state === 'speaking' && responseText}
+      </div>
     </div>
   );
 };
